@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoutly - Your RecruiterBot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
+
+</head>
+<body>
+
+<div class="menu-icon" onclick="toggleSidebar()">
+    ☰
+</div>
+
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+    <h3>Menu</h3>
+    <form id="emailForm" class="row g-3">
+        <div class="col-12">
+            <label for="subject" class="form-label">Email Subject</label>
+            <input type="text" class="form-control" id="subject" name="subject" required>
+        </div>
+        <div class="col-12 text-center">
+            <button type="button" class="btn" onclick="fetchResumes()">Run</button>
+        </div>
+    </form>
+</div>
+
+
+<!-- Chat-Bot -->
+
+<div class="chatbot-container">
+    <!-- Header -->
+    <div class="header">
+        <h2>Scoutly</h2>
+    </div>
+
+    <!-- Form for Job Offer Input -->
+    <div class="offer-form">
+        <h4>Enter Job Offer Details</h4>
+        <form id="offerForm" class="row g-3">
+            <div class="col-md-6">
+                <label for="titre" class="form-label">Titre</label>
+                <input type="text" class="form-control" id="titre" name="titre" required>
+            </div>
+
+            <div class="col-md-6">
+                <label for="competences" class="form-label">Compétences (comma-separated)</label>
+                <input type="text" class="form-control" id="competences" name="competences" required>
+            </div>
+
+            <div class="col-md-6">
+                <label for="experience_minimale" class="form-label">Expérience Minimale (years)</label>
+                <input type="number" class="form-control" id="experience_minimale" name="experience_minimale" required>
+            </div>
+
+            <div class="col-md-6">
+                <label for="certifications" class="form-label">Certifications (comma-separated)</label>
+                <input type="text" class="form-control" id="certifications" name="certifications">
+            </div>
+
+            <div class="col-md-6">
+                <label for="localisation" class="form-label">Localisation</label>
+                <input type="text" class="form-control" id="localisation" name="localisation" required>
+            </div>
+
+            <div class="col-md-6">
+                <label for="langues" class="form-label">Langues (comma-separated)</label>
+                <input type="text" class="form-control" id="langues" name="langues" required>
+            </div>
+
+            <div class="col-12 text-end">
+                <button type="button" class="btn submit-btn" onclick="submitOffer()">Submit</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Chat Window -->
+    <div class="chat-window d-flex flex-column">
+        <div id="chatWindow">
+            <div class="message bot">
+                <p>Welcome! I'm Scoutly, your HR assistant. Enter a job offer above to find matching candidates.</p>
+            </div>
+            <!-- Messages will be dynamically added here -->
+        </div>
+    </div>
+</div>
+</body>
+
+<script>
+function submitOffer() {
+    // Gather input values
+    const offer = {
+        titre: document.getElementById('titre').value,
+        competences: document.getElementById('competences').value.split(',').map(item => item.trim()),
+        experience_minimale: parseInt(document.getElementById('experience_minimale').value),
+        certifications: document.getElementById('certifications').value.split(',').map(item => item.trim()),
+        localisation: document.getElementById('localisation').value,
+        langues: document.getElementById('langues').value.split(',').map(item => item.trim())
+    };
+
+    // Reference to the chat window
+    const chatWindow = document.getElementById('chatWindow');
+
+    // Display a loading message
+    chatWindow.innerHTML += `
+        <div class="message user">
+            <p>Processing your job offer...</p>
+        </div>
+    `;
+
+    // Send data to Flask backend via a POST request
+    fetch('/process-offer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(offer),
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json(); // Assuming backend returns JSON data
+    })
+    .then(data => {
+        // Clear the chat window and display results
+        chatWindow.innerHTML += `
+            <div class="message bot">
+                <p>Here are the top candidates:</p>
+        `;
+
+        if (data.top_candidates && data.top_candidates.length > 0) {
+            data.top_candidates.forEach(candidate => {
+                chatWindow.innerHTML += `
+                    <div class="message bot">
+                        <p><strong>Name:</strong> ${candidate.Name}</p>
+                        <p><strong>Email:</strong> ${candidate.Email}</p>
+                        <p><strong>Skills:</strong> ${candidate.Skills}</p>
+                        <p><strong>Experience:</strong> ${candidate.Experience}</p>
+                        <p><strong>Certifications:</strong> ${candidate.Certifications}</p>
+                        <p><strong>Localisation:</strong> ${candidate.Localisation}</p>
+                        <p><strong>Langues:</strong> ${candidate.Langues}</p>
+                        <p><strong>Score:</strong> ${candidate.Score}</p>
+                    </div>
+                `;
+            });
+        } else {
+            chatWindow.innerHTML += `
+                <div class="message bot">
+                    <p>No candidates found matching the criteria.</p>
+                </div>
+            `;
+        }
+        chatWindow.innerHTML += `</div>`;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        chatWindow.innerHTML += `
+            <div class="message bot">
+                <p>Something went wrong while processing the offer. Please try again later.</p>
+            </div>
+        `;
+    });
+}
+
+
+
+
+
+// FETCH RESUMES FROM EMAIL
+
+    // Toggle the sidebar
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const container = document.querySelector('.chatbot-container');
+        sidebar.classList.toggle('open');
+        container.classList.toggle('sidebar-open');
+    }
+
+    // Fetch resumes based on email subject
+    function fetchResumes() {
+        const subject = document.getElementById('subject').value;
+
+        // Ensure the subject field is not empty
+        if (!subject) {
+            alert('Please enter an email subject!');
+            return;
+        }
+
+        // Display loading message in chat window
+        const chatWindow = document.getElementById('chatWindow');
+        chatWindow.innerHTML += `
+            <div class="message user">
+                <p>Fetching resumes for subject: "${subject}"...</p>
+            </div>
+        `;
+
+        // Send data to Flask backend
+        fetch('/fetch-resumes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ subject }),
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json(); // Assuming backend returns JSON data
+            })
+            .then(data => {
+                // Append results to chat window
+                if (data.resumes && data.resumes.length > 0) {
+                    chatWindow.innerHTML += `
+                        <div class="message bot">
+                            <p>Resumes downloaded successfully:</p>
+                            <ul>
+                                ${data.resumes.map(resume => `<li>${resume}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    chatWindow.innerHTML += `
+                        <div class="message bot">
+                            <p>No resumes found for the provided subject.</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                chatWindow.innerHTML += `
+                    <div class="message bot">
+                        <p>Something went wrong while fetching resumes. Please try again later.</p>
+                    </div>
+                `;
+            });
+    }
+</script>
+
+</html>
